@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import seaborn as sns
 import kagglehub
 import os
@@ -9,9 +10,29 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-# -------------------------------
+# -----------------------------------
+# 한글 폰트 설정
+# -----------------------------------
+
+try:
+    font_path = "C:/Windows/Fonts/malgun.ttf"
+
+    font_name = fm.FontProperties(
+        fname=font_path
+    ).get_name()
+
+    plt.rc('font', family=font_name)
+
+    sns.set(font=font_name)
+
+except:
+    pass
+
+plt.rcParams['axes.unicode_minus'] = False
+
+# -----------------------------------
 # 페이지 설정
-# -------------------------------
+# -----------------------------------
 
 st.set_page_config(
     page_title="폐암 환자 군집 분석",
@@ -19,29 +40,37 @@ st.set_page_config(
     layout="wide"
 )
 
-# -------------------------------
+# -----------------------------------
 # 제목
-# -------------------------------
+# -----------------------------------
 
 st.title("🫁 폐암 환자 군집 분석")
 st.markdown("### K-Means 군집화를 활용한 데이터 분석")
 
-# -------------------------------
-# 캐글 데이터 불러오기
-# -------------------------------
+# -----------------------------------
+# 데이터 불러오기
+# -----------------------------------
 
 @st.cache_data
 def load_data():
 
-    # 데이터 다운로드
+    # 캐글 데이터 다운로드
     path = kagglehub.dataset_download(
         "yusufdede/lung-cancer-dataset"
     )
 
-    # CSV 경로 설정
+    # CSV 자동 탐색
+    files = os.listdir(path)
+
+    csv_file = [
+        f for f in files
+        if f.endswith(".csv")
+    ][0]
+
+    # CSV 경로
     csv_path = os.path.join(
         path,
-        "lung_cancer_examples.csv"
+        csv_file
     )
 
     # 데이터 읽기
@@ -53,80 +82,48 @@ try:
 
     df = load_data()
 
-    st.success("✅ 캐글 데이터 불러오기 완료!")
+    st.success("✅ Kaggle 데이터 불러오기 완료!")
 
-    # -------------------------------
-    # 데이터 확인
-    # -------------------------------
+    # -----------------------------------
+    # 원본 데이터
+    # -----------------------------------
 
     st.subheader("📄 원본 데이터")
 
     st.dataframe(df)
 
-    # -------------------------------
-    # 컬럼 확인
-    # -------------------------------
+    # -----------------------------------
+    # 컬럼 정보
+    # -----------------------------------
 
-    st.subheader("📌 컬럼 정보")
+    st.subheader("📌 컬럼 목록")
 
     st.write(df.columns)
 
-    # -------------------------------
-    # 문자 데이터 숫자로 변환
-    # -------------------------------
-
-    binary_cols = [
-        'GENDER',
-        'LUNG_CANCER',
-        'SMOKING',
-        'YELLOW_FINGERS',
-        'ANXIETY',
-        'PEER_PRESSURE',
-        'CHRONIC DISEASE',
-        'FATIGUE ',
-        'ALLERGY ',
-        'WHEEZING',
-        'ALCOHOL CONSUMING',
-        'COUGHING',
-        'SHORTNESS OF BREATH',
-        'SWALLOWING DIFFICULTY',
-        'CHEST PAIN'
-    ]
-
-    for col in binary_cols:
-
-        df[col] = df[col].replace({
-            'M': 1,
-            'F': 0,
-            'YES': 1,
-            'NO': 0
-        })
-
-    # -------------------------------
-    # 사용할 변수 선택
-    # -------------------------------
+    # -----------------------------------
+    # 사용할 변수
+    # -----------------------------------
 
     features = [
-        'AGE',
-        'SMOKING',
-        'ALCOHOL CONSUMING',
-        'COUGHING',
-        'CHEST PAIN'
+        'Age',
+        'Smokes',
+        'AreaQ',
+        'Alkhol'
     ]
 
     X = df[features]
 
-    # -------------------------------
+    # -----------------------------------
     # 데이터 스케일링
-    # -------------------------------
+    # -----------------------------------
 
     scaler = StandardScaler()
 
     X_scaled = scaler.fit_transform(X)
 
-    # -------------------------------
-    # 사이드바 설정
-    # -------------------------------
+    # -----------------------------------
+    # 사이드바
+    # -----------------------------------
 
     st.sidebar.header("⚙️ 설정")
 
@@ -137,22 +134,23 @@ try:
         3
     )
 
-    # -------------------------------
+    # -----------------------------------
     # KMeans 모델
-    # -------------------------------
+    # -----------------------------------
 
     model = KMeans(
         n_clusters=k,
-        random_state=42
+        random_state=42,
+        n_init=10
     )
 
     model.fit(X_scaled)
 
     df["cluster"] = model.labels_
 
-    # -------------------------------
+    # -----------------------------------
     # 실루엣 점수
-    # -------------------------------
+    # -----------------------------------
 
     score = silhouette_score(
         X_scaled,
@@ -166,45 +164,51 @@ try:
         round(score, 3)
     )
 
-    # -------------------------------
+    # -----------------------------------
     # 군집별 평균
-    # -------------------------------
+    # -----------------------------------
 
     st.subheader("📊 군집별 평균")
 
-    cluster_mean = df.groupby("cluster")[features].mean()
+    cluster_mean = df.groupby(
+        "cluster"
+    )[features].mean()
 
     st.dataframe(cluster_mean)
 
-    # -------------------------------
-    # 군집 시각화
-    # -------------------------------
+    # -----------------------------------
+    # 산점도
+    # -----------------------------------
 
     st.subheader("🎨 군집 시각화")
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(
+        figsize=(8, 6)
+    )
 
     scatter = ax.scatter(
-        df["AGE"],
-        df["ALCOHOL CONSUMING"],
+        df["Age"],
+        df["Smokes"],
         c=df["cluster"],
         cmap="viridis",
         s=80
     )
 
     ax.set_xlabel("나이")
-    ax.set_ylabel("음주 여부")
+    ax.set_ylabel("흡연량")
     ax.set_title("폐암 환자 군집 분석")
 
     st.pyplot(fig)
 
-    # -------------------------------
+    # -----------------------------------
     # 히트맵
-    # -------------------------------
+    # -----------------------------------
 
     st.subheader("🔥 상관관계 히트맵")
 
-    fig2, ax2 = plt.subplots(figsize=(10, 6))
+    fig2, ax2 = plt.subplots(
+        figsize=(8, 5)
+    )
 
     sns.heatmap(
         df[features].corr(),
@@ -215,11 +219,11 @@ try:
 
     st.pyplot(fig2)
 
-    # -------------------------------
-    # 새로운 환자 예측
-    # -------------------------------
+    # -----------------------------------
+    # 새 환자 예측
+    # -----------------------------------
 
-    st.subheader("🧪 새로운 환자 군집 예측")
+    st.subheader("🧪 새 환자 군집 예측")
 
     age = st.slider(
         "나이",
@@ -228,24 +232,25 @@ try:
         40
     )
 
-    smoking = st.selectbox(
-        "흡연 여부",
-        [0, 1]
+    smokes = st.slider(
+        "흡연량",
+        0,
+        50,
+        5
     )
 
-    alcohol = st.selectbox(
-        "음주 여부",
-        [0, 1]
+    areaq = st.slider(
+        "공기질 점수",
+        0,
+        10,
+        5
     )
 
-    coughing = st.selectbox(
-        "기침 여부",
-        [0, 1]
-    )
-
-    chest_pain = st.selectbox(
-        "가슴 통증 여부",
-        [0, 1]
+    alkhol = st.slider(
+        "음주량",
+        0,
+        10,
+        3
     )
 
     if st.button("🔍 예측하기"):
@@ -253,21 +258,53 @@ try:
         new_data = pd.DataFrame(
             [[
                 age,
-                smoking,
-                alcohol,
-                coughing,
-                chest_pain
+                smokes,
+                areaq,
+                alkhol
             ]],
             columns=features
         )
 
-        new_scaled = scaler.transform(new_data)
+        new_scaled = scaler.transform(
+            new_data
+        )
 
-        pred = model.predict(new_scaled)
+        pred = model.predict(
+            new_scaled
+        )
 
         st.success(
-            f"✅ 이 환자는 {pred[0]}번 군집입니다!"
+            f"✅ 예측 군집: {pred[0]}"
         )
+
+        # 새 환자 위치 시각화
+
+        fig3, ax3 = plt.subplots(
+            figsize=(8, 6)
+        )
+
+        ax3.scatter(
+            df["Age"],
+            df["Smokes"],
+            c=df["cluster"],
+            cmap="viridis",
+            alpha=0.5,
+            s=80
+        )
+
+        ax3.scatter(
+            age,
+            smokes,
+            color="red",
+            marker="X",
+            s=300
+        )
+
+        ax3.set_xlabel("나이")
+        ax3.set_ylabel("흡연량")
+        ax3.set_title("새 환자 위치")
+
+        st.pyplot(fig3)
 
 except Exception as e:
 

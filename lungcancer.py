@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import seaborn as sns
 import kagglehub
 import os
@@ -9,9 +10,25 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-# -------------------------
+# ---------------------------------
+# 한글 폰트 설정
+# ---------------------------------
+
+font_path = "C:/Windows/Fonts/malgun.ttf"
+
+font_name = fm.FontProperties(
+    fname=font_path
+).get_name()
+
+plt.rc('font', family=font_name)
+
+sns.set(font=font_name)
+
+plt.rcParams['axes.unicode_minus'] = False
+
+# ---------------------------------
 # 페이지 설정
-# -------------------------
+# ---------------------------------
 
 st.set_page_config(
     page_title="폐암 환자 군집 분석",
@@ -19,22 +36,24 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🫁 폐암 환자 군집 분석")
-st.markdown("### K-Means 군집화")
+# ---------------------------------
+# 제목
+# ---------------------------------
 
-# -------------------------
+st.title("🫁 폐암 환자 군집 분석")
+st.markdown("### K-Means 군집화를 활용한 데이터 분석")
+
+# ---------------------------------
 # 데이터 불러오기
-# -------------------------
+# ---------------------------------
 
 @st.cache_data
 def load_data():
 
-    # 캐글 데이터 다운로드
     path = kagglehub.dataset_download(
         "yusufdede/lung-cancer-dataset"
     )
 
-    # CSV 자동 찾기
     files = os.listdir(path)
 
     csv_file = [
@@ -47,7 +66,6 @@ def load_data():
         csv_file
     )
 
-    # 데이터 읽기
     df = pd.read_csv(csv_path)
 
     return df
@@ -58,25 +76,25 @@ try:
 
     st.success("✅ 데이터 불러오기 완료!")
 
-    # -------------------------
-    # 데이터 보기
-    # -------------------------
+    # ---------------------------------
+    # 원본 데이터
+    # ---------------------------------
 
     st.subheader("📄 원본 데이터")
 
     st.dataframe(df)
 
-    # -------------------------
-    # 컬럼 확인
-    # -------------------------
+    # ---------------------------------
+    # 컬럼 정보
+    # ---------------------------------
 
     st.subheader("📌 컬럼 목록")
 
     st.write(df.columns)
 
-    # -------------------------
+    # ---------------------------------
     # 사용할 변수
-    # -------------------------
+    # ---------------------------------
 
     features = [
         'Age',
@@ -87,30 +105,30 @@ try:
 
     X = df[features]
 
-    # -------------------------
-    # 스케일링
-    # -------------------------
+    # ---------------------------------
+    # 데이터 스케일링
+    # ---------------------------------
 
     scaler = StandardScaler()
 
     X_scaled = scaler.fit_transform(X)
 
-    # -------------------------
+    # ---------------------------------
     # 사이드바
-    # -------------------------
+    # ---------------------------------
 
     st.sidebar.header("⚙️ 설정")
 
     k = st.sidebar.slider(
-        "군집 개수",
+        "군집 개수 선택",
         2,
         6,
         3
     )
 
-    # -------------------------
-    # 모델 생성
-    # -------------------------
+    # ---------------------------------
+    # KMeans 모델
+    # ---------------------------------
 
     model = KMeans(
         n_clusters=k,
@@ -121,9 +139,9 @@ try:
 
     df["cluster"] = model.labels_
 
-    # -------------------------
+    # ---------------------------------
     # 실루엣 점수
-    # -------------------------
+    # ---------------------------------
 
     score = silhouette_score(
         X_scaled,
@@ -137,9 +155,9 @@ try:
         round(score, 3)
     )
 
-    # -------------------------
+    # ---------------------------------
     # 군집별 평균
-    # -------------------------
+    # ---------------------------------
 
     st.subheader("📊 군집별 평균")
 
@@ -149,9 +167,9 @@ try:
 
     st.dataframe(cluster_mean)
 
-    # -------------------------
-    # 산점도
-    # -------------------------
+    # ---------------------------------
+    # 산점도 시각화
+    # ---------------------------------
 
     st.subheader("🎨 군집 시각화")
 
@@ -169,15 +187,15 @@ try:
 
     ax.set_xlabel("나이")
     ax.set_ylabel("흡연량")
-    ax.set_title("폐암 환자 군집")
+    ax.set_title("폐암 환자 군집 분석")
 
     st.pyplot(fig)
 
-    # -------------------------
+    # ---------------------------------
     # 히트맵
-    # -------------------------
+    # ---------------------------------
 
-    st.subheader("🔥 상관관계")
+    st.subheader("🔥 상관관계 히트맵")
 
     fig2, ax2 = plt.subplots(
         figsize=(8, 5)
@@ -192,9 +210,9 @@ try:
 
     st.pyplot(fig2)
 
-    # -------------------------
+    # ---------------------------------
     # 새 환자 예측
-    # -------------------------
+    # ---------------------------------
 
     st.subheader("🧪 새 환자 군집 예측")
 
@@ -249,6 +267,35 @@ try:
         st.success(
             f"✅ 예측 군집: {pred[0]}"
         )
+
+        # 새 환자 시각화
+
+        fig3, ax3 = plt.subplots(
+            figsize=(8, 6)
+        )
+
+        ax3.scatter(
+            df["Age"],
+            df["Smokes"],
+            c=df["cluster"],
+            cmap="viridis",
+            alpha=0.5,
+            s=80
+        )
+
+        ax3.scatter(
+            age,
+            smokes,
+            color="red",
+            marker="X",
+            s=300
+        )
+
+        ax3.set_xlabel("나이")
+        ax3.set_ylabel("흡연량")
+        ax3.set_title("새 환자 위치")
+
+        st.pyplot(fig3)
 
 except Exception as e:
 
